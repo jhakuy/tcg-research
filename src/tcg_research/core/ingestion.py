@@ -8,11 +8,13 @@ import structlog
 from sqlalchemy.orm import Session
 
 from tcg_research.mcp.ebay_browse import EbayBrowseClient, search_pokemon_cards
+from tcg_research.mcp.enhanced_ebay_browse import EnhancedEbayBrowseClient, search_enhanced_pokemon_cards
 from tcg_research.mcp.pricecharting import PriceChartingClient, search_pokemon_prices
 from tcg_research.mcp.psa_api import PSAClient, get_psa_population
 from tcg_research.mcp.tcgdx import search_pokemon_cards_tcgdx
 from tcg_research.models.database import Card, EbayListing, PriceHistory, PSAPopulation
 from tcg_research.core.entity_resolver import EntityResolver
+from tcg_research.core.enhanced_entity_resolver import FilteredEntityResolver
 
 logger = structlog.get_logger()
 
@@ -24,14 +26,23 @@ class DataIngestionPipeline:
         self,
         db_session: Session,
         ebay_client: EbayBrowseClient | None = None,
+        enhanced_ebay_client: EnhancedEbayBrowseClient | None = None,
         pricecharting_client: PriceChartingClient | None = None,
         psa_client: PSAClient | None = None,
+        use_enhanced_filtering: bool = True,
     ) -> None:
         self.db_session = db_session
         self.ebay_client = ebay_client
+        self.enhanced_ebay_client = enhanced_ebay_client
         self.pricecharting_client = pricecharting_client
         self.psa_client = psa_client
-        self.entity_resolver = EntityResolver()
+        self.use_enhanced_filtering = use_enhanced_filtering
+        
+        # Use enhanced resolver if filtering is enabled
+        if use_enhanced_filtering:
+            self.entity_resolver = FilteredEntityResolver()
+        else:
+            self.entity_resolver = EntityResolver()
 
     async def run_daily_ingestion(self) -> dict[str, int]:
         """Run daily data ingestion."""
@@ -175,38 +186,93 @@ class DataIngestionPipeline:
         return card
 
     async def _ingest_ebay_data(self, card: Card, query: str, results: dict[str, int]) -> None:
-        """Ingest eBay listing data."""
+        """Ingest eBay listing data with enhanced filtering."""
         try:
-            # Use mock function for now since we don't have real eBay credentials
-            listings_data = await search_pokemon_cards(query)
+            if self.use_enhanced_filtering and self.enhanced_ebay_client:
+                # Use enhanced eBay client with filtering
+                filtered_listings = await self.enhanced_ebay_client.search_pokemon_cards(
+                    query=query,
+                    max_results=20,
+                    include_entity_resolution=False  # We already have the card entity
+                )
+                
+                high_quality_count = 0
+                for filtered_item in filtered_listings:
+                    # Only process high-quality listings
+                    if (filtered_item.filter_quality.value in ['excellent', 'good'] and
+                        filtered_item.card_type.value == 'single_card'):
+                        
+                        # Check if listing already exists
+                        existing = self.db_session.query(EbayListing).filter_by(
+                            item_id=filtered_item.item_id,
+                            card_id=card.id,
+                        ).first()
 
-            for listing_data in listings_data[:10]:  # Limit to 10 listings per card
-                # Check if listing already exists
-                existing = self.db_session.query(EbayListing).filter_by(
-                    item_id=listing_data["item_id"],
-                    card_id=card.id,
-                ).first()
+                        if existing:
+                            # Update existing listing
+                            existing.price = filtered_item.price
+                            existing.is_active = True
+                            existing.last_seen = datetime.utcnow()
+                        else:
+                            # Create new listing with filter metadata
+                            listing = EbayListing(
+                                card_id=card.id,
+                                item_id=filtered_item.item_id,
+                                title=filtered_item.title,
+                                price=filtered_item.price,
+                                currency=filtered_item.currency,
+                                condition=filtered_item.condition,
+                                listing_type=filtered_item.listing_type,
+                                seller_username=filtered_item.seller_username,
+                                view_item_url=filtered_item.view_item_url,
+                                image_url=filtered_item.image_url,
+                            )
+                            self.db_session.add(listing)
+                            results["ebay_listings"] += 1
+                            high_quality_count += 1
+                            
+                        # Limit high-quality listings per card
+                        if high_quality_count >= 10:
+                            break
+                            
+                logger.info(
+                    "Enhanced eBay ingestion completed",
+                    card_sku=card.canonical_sku,
+                    total_found=len(filtered_listings),
+                    high_quality_stored=high_quality_count
+                )
+                
+            else:
+                # Fallback to basic ingestion
+                listings_data = await search_pokemon_cards(query)
 
-                if existing:
-                    # Update existing listing
-                    existing.price = listing_data.get("price")
-                    existing.is_active = True
-                    existing.last_seen = datetime.utcnow()
-                else:
-                    # Create new listing
-                    listing = EbayListing(
-                        card_id=card.id,
+                for listing_data in listings_data[:10]:  # Limit to 10 listings per card
+                    # Check if listing already exists
+                    existing = self.db_session.query(EbayListing).filter_by(
                         item_id=listing_data["item_id"],
-                        title=listing_data["title"],
-                        price=listing_data.get("price"),
-                        currency=listing_data.get("currency", "USD"),
-                        condition=listing_data.get("condition"),
-                        listing_type=listing_data.get("listing_type"),
-                        seller_username=listing_data.get("seller"),
-                        view_item_url=listing_data.get("url"),
-                    )
-                    self.db_session.add(listing)
-                    results["ebay_listings"] += 1
+                        card_id=card.id,
+                    ).first()
+
+                    if existing:
+                        # Update existing listing
+                        existing.price = listing_data.get("price")
+                        existing.is_active = True
+                        existing.last_seen = datetime.utcnow()
+                    else:
+                        # Create new listing
+                        listing = EbayListing(
+                            card_id=card.id,
+                            item_id=listing_data["item_id"],
+                            title=listing_data["title"],
+                            price=listing_data.get("price"),
+                            currency=listing_data.get("currency", "USD"),
+                            condition=listing_data.get("condition"),
+                            listing_type=listing_data.get("listing_type"),
+                            seller_username=listing_data.get("seller"),
+                            view_item_url=listing_data.get("url"),
+                        )
+                        self.db_session.add(listing)
+                        results["ebay_listings"] += 1
 
         except Exception as e:
             logger.error("eBay ingestion failed", card_sku=card.canonical_sku, error=str(e))

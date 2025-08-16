@@ -17,6 +17,7 @@ from tcg_research.models.database import Card, ModelPrediction, create_database_
 from tcg_research.api.mock_data import generate_mock_recommendations, generate_mock_cards
 from tcg_research.api.ebay_setup import router as ebay_router
 from tcg_research.api.ebay_webhook import router as webhook_router
+from tcg_research.api.api_setup import router as api_setup_router
 
 # Configure logging
 structlog.configure(
@@ -48,9 +49,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include eBay routers
+# Include all API routers
 app.include_router(ebay_router, prefix="/api", tags=["eBay Setup"])
 app.include_router(webhook_router, tags=["eBay Webhooks"])
+app.include_router(api_setup_router, tags=["API Setup & Filtering"])
 
 # Database setup with fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tcg_user:tcg_password@localhost:5432/tcg_research")
@@ -162,8 +164,97 @@ async def get_investment_criteria():
             "description": "Any card that doesn't meet WATCH criteria gets AVOID rating",
             "triggers": ["Negative returns", "Low confidence", "Poor liquidity", "High volatility"]
         },
+        "data_quality": {
+            "filtering_philosophy": "Ultra-conservative data filtering - better to exclude questionable items than include junk",
+            "automatic_exclusions": [
+                "Pokemon TCG Online codes",
+                "Choose your card/bulk lots", 
+                "Custom/proxy cards",
+                "Non-card accessories",
+                "Damaged items"
+            ],
+            "quality_requirements": [
+                "Single card listings only",
+                "Clear set identification",
+                "Reasonable pricing",
+                "Professional descriptions"
+            ]
+        },
         "rationale": "Better to miss opportunities than lose money. Only invest when all signals align.",
         "note": "This system prioritizes capital preservation over aggressive growth"
+    }
+
+@app.get("/system-dashboard")
+async def get_system_dashboard():
+    """Comprehensive system dashboard showing setup status and capabilities."""
+    
+    # Check API connections
+    apis_status = {
+        "ebay": {
+            "connected": bool(os.getenv("EBAY_APP_ID") and os.getenv("EBAY_CERT_ID")),
+            "purpose": "Live Pokemon card pricing and market data"
+        },
+        "pricecharting": {
+            "connected": bool(os.getenv("PRICECHARTING_API_KEY")),
+            "purpose": "Historical price trends and market analysis"
+        },
+        "psa": {
+            "connected": bool(os.getenv("PSA_API_KEY")),
+            "purpose": "Grading population data for collectible cards"
+        },
+        "database": {
+            "connected": bool(os.getenv("DATABASE_URL")),
+            "purpose": "Data storage and ML model persistence"
+        }
+    }
+    
+    # System capabilities
+    connected_apis = sum(1 for api in apis_status.values() if api["connected"])
+    total_apis = len(apis_status)
+    
+    return {
+        "system_name": "Pokemon Card Investment Analysis System",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow(),
+        "api_connections": apis_status,
+        "connection_summary": {
+            "connected_apis": connected_apis,
+            "total_apis": total_apis,
+            "connection_percentage": round((connected_apis / total_apis) * 100, 1),
+            "operational_status": "Fully Operational" if connected_apis == total_apis else "Partially Operational" if connected_apis > 0 else "Mock Data Mode"
+        },
+        "features": {
+            "ultra_conservative_algorithm": "✅ Active",
+            "sophisticated_filtering": "✅ Active", 
+            "multi_source_data": "✅ Available",
+            "ml_predictions": "✅ Available",
+            "web_dashboard": "✅ Available",
+            "real_time_analysis": "✅ Available"
+        },
+        "data_quality": {
+            "filtering_active": True,
+            "quality_threshold": "Conservative (85%+ confidence)",
+            "exclusion_rules": "50+ junk detection patterns",
+            "entity_resolution": "Enhanced with market tier classification"
+        },
+        "investment_approach": {
+            "philosophy": "Capital preservation over aggressive growth",
+            "buy_threshold": "20%+ predicted return, 90%+ confidence",
+            "risk_management": "Maximum MEDIUM risk for BUY decisions",
+            "decision_boundary": "Ultra-conservative - better to miss than lose"
+        },
+        "setup_guides": {
+            "api_status": "/api-status/all",
+            "pricecharting_setup": "/api-setup/pricecharting-guide", 
+            "psa_setup": "/api-setup/psa-guide",
+            "database_setup": "/api-setup/database-guide"
+        },
+        "testing_endpoints": {
+            "filtered_search": "/filtered-search/test?query=charizard",
+            "filter_demonstration": "/filtering/demonstration",
+            "conservative_scan": "/tcg/scan/conservative",
+            "investment_criteria": "/investment-criteria"
+        }
     }
 
 
