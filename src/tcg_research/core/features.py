@@ -8,7 +8,7 @@ import structlog
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from ..models.database import (
+from tcg_research.models.database import (
     Card,
     CardFeature,
     EbayListing,

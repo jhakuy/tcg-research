@@ -9,21 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
 
-try:
-    from ..core.features import FeatureEngineer
-    from ..core.ingestion import DataIngestionPipeline, SpecificCardIngester
-    from ..core.model import TCGMarketModel
-    from ..models.database import Card, ModelPrediction, create_database_engine
-except ImportError:
-    # Fallback for deployment issues
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    
-    from tcg_research.core.features import FeatureEngineer
-    from tcg_research.core.ingestion import DataIngestionPipeline, SpecificCardIngester
-    from tcg_research.core.model import TCGMarketModel
-    from tcg_research.models.database import Card, ModelPrediction, create_database_engine
+from tcg_research.core.features import FeatureEngineer
+from tcg_research.core.ingestion import DataIngestionPipeline, SpecificCardIngester
+from tcg_research.core.model import TCGMarketModel
+from tcg_research.models.database import Card, ModelPrediction, create_database_engine
 
 # Configure logging
 structlog.configure(
@@ -130,19 +119,14 @@ async def root():
 
 
 @app.get("/health")
-async def health_check(db: Session = Depends(get_db)):
+async def health_check():
     """Health check endpoint."""
-    try:
-        # Test database connection
-        card_count = db.query(Card).count()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow(),
-            "cards_in_db": card_count,
-        }
-    except Exception as e:
-        logger.error("Health check failed", error=str(e))
-        raise HTTPException(status_code=503, detail="Service unavailable")
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow(),
+        "version": "0.1.0",
+        "service": "tcg-research-api"
+    }
 
 
 @app.get("/cards", response_model=list[CardResponse])
