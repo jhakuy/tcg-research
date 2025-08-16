@@ -16,6 +16,7 @@ from tcg_research.core.conservative_model import ConservativeDecisionEngine
 from tcg_research.models.database import Card, ModelPrediction, create_database_engine
 from tcg_research.api.mock_data import generate_mock_recommendations, generate_mock_cards
 from tcg_research.api.ebay_setup import router as ebay_router
+from tcg_research.api.ebay_webhook import router as webhook_router
 
 # Configure logging
 structlog.configure(
@@ -47,8 +48,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include eBay setup router
+# Include eBay routers
 app.include_router(ebay_router, prefix="/api", tags=["eBay Setup"])
+app.include_router(webhook_router, tags=["eBay Webhooks"])
 
 # Database setup with fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tcg_user:tcg_password@localhost:5432/tcg_research")
