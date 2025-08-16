@@ -7,12 +7,12 @@ from typing import Any
 import structlog
 from sqlalchemy.orm import Session
 
-from ..mcp.ebay_browse import EbayBrowseClient, search_pokemon_cards
-from ..mcp.pricecharting import PriceChartingClient, search_pokemon_prices
-from ..mcp.psa_api import PSAClient, get_psa_population
-from ..mcp.tcgdx import search_pokemon_cards_tcgdx
-from ..models.database import Card, EbayListing, PriceHistory, PSAPopulation
-from .entity_resolver import EntityResolver
+from tcg_research.mcp.ebay_browse import EbayBrowseClient, search_pokemon_cards
+from tcg_research.mcp.pricecharting import PriceChartingClient, search_pokemon_prices
+from tcg_research.mcp.psa_api import PSAClient, get_psa_population
+from tcg_research.mcp.tcgdx import search_pokemon_cards_tcgdx
+from tcg_research.models.database import Card, EbayListing, PriceHistory, PSAPopulation
+from tcg_research.core.entity_resolver import EntityResolver
 
 logger = structlog.get_logger()
 

@@ -15,8 +15,8 @@ from sklearn.metrics import (
 from sklearn.model_selection import TimeSeriesSplit
 from sqlalchemy.orm import Session
 
-from ..models.database import Card, CardFeature, ModelPrediction
-from .features import FeatureEngineer
+from tcg_research.models.database import Card, CardFeature, ModelPrediction
+from tcg_research.core.features import FeatureEngineer
 
 logger = structlog.get_logger()
 
