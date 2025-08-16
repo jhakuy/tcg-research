@@ -25,13 +25,31 @@ COPY alembic/ /app/alembic/
 RUN echo '#!/usr/bin/env python3\n\
 import os\n\
 import sys\n\
-print("Starting TCG Research API...")\n\
+print("="*50)\n\
+print("TCG Research API - Startup Diagnostics")\n\
+print("="*50)\n\
 print(f"Working directory: {os.getcwd()}")\n\
-print(f"Contents of /app: {os.listdir(\"/app\")}")\n\
+print(f"Python path: {sys.path[:3]}")\n\
+print(f"DATABASE_URL set: {\"DATABASE_URL\" in os.environ}")\n\
+print(f"PORT: {os.environ.get(\"PORT\", \"8000 (default)\")}")\n\
+print(f"\\nContents of /app: {os.listdir(\"/app\")}")\n\
 if os.path.exists("/app/tcg_research"):\n\
     print(f"Contents of /app/tcg_research: {os.listdir(\"/app/tcg_research\")}")\n\
     if os.path.exists("/app/tcg_research/models"):\n\
         print(f"Contents of /app/tcg_research/models: {os.listdir(\"/app/tcg_research/models\")}")\n\
+        print("✓ Models directory found!")\n\
+    else:\n\
+        print("✗ Models directory NOT found!")\n\
+else:\n\
+    print("✗ tcg_research package NOT found!")\n\
+print("="*50)\n\
+print("Starting server...")\n\
+try:\n\
+    import tcg_research.api.main\n\
+    print("✓ Successfully imported tcg_research.api.main")\n\
+except ImportError as e:\n\
+    print(f"✗ Failed to import: {e}")\n\
+    sys.exit(1)\n\
 import uvicorn\n\
 port = int(os.environ.get("PORT", 8000))\n\
 print(f"Starting server on port {port}")\n\
