@@ -13,15 +13,21 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and package configuration
+# Copy source code
 COPY src/ ./src/
-COPY pyproject.toml .
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY init-db.sql .
 
-# Install the package in editable mode - this fixes the import issue
-RUN pip install -e .
+# DEBUG: Show what we copied
+RUN echo "=== DEBUG: Files copied ===" && \
+    ls -la src/ && \
+    echo "=== tcg_research contents ===" && \
+    ls -la src/tcg_research/ && \
+    echo "=== models contents ===" && \
+    ls -la src/tcg_research/models/ && \
+    echo "=== Test import ===" && \
+    cd src && python -c "from tcg_research.models.database import Card; print('SUCCESS: Import works')"
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -30,5 +36,5 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Run uvicorn - now tcg_research is properly installed as a package
-CMD ["uvicorn", "tcg_research.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use app-dir to point to src layout
+CMD ["uvicorn", "tcg_research.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
