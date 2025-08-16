@@ -16,15 +16,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy ALL files to app root - bypass any path issues
 COPY . .
 
-# Set PYTHONPATH to current directory
-ENV PYTHONPATH=/app/src
-
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
+# Change to src directory where the package lives
+WORKDIR /app/src
+
 # Expose port
 EXPOSE 8000
 
-# Run uvicorn with simple path
+# Run uvicorn from src directory
 CMD ["python", "-m", "uvicorn", "tcg_research.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
