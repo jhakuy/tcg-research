@@ -41,8 +41,9 @@ data/
 logs/
 *.log
 
-# Models
-models/
+# ML Models (but not source code)
+/models/
+/saved_models/
 *.pkl
 *.joblib
 

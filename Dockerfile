@@ -12,11 +12,13 @@ RUN apt-get update && apt-get install -y gcc g++ libpq-dev && rm -rf /var/lib/ap
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire repository
-COPY . .
-
-# Copy startup script (must be before changing user)
+# Copy source code explicitly
+COPY src/ /app/src/
 COPY start_server.py /app/
+COPY requirements.txt /app/
+# Copy other project files if they exist
+COPY alembic.ini /app/
+COPY alembic/ /app/alembic/
 
 # Set PYTHONPATH to include the src directory
 ENV PYTHONPATH=/app/src
