@@ -19,15 +19,13 @@ COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY init-db.sql .
 
-# DEBUG: Show what we copied
-RUN echo "=== DEBUG: Files copied ===" && \
-    ls -la src/ && \
-    echo "=== tcg_research contents ===" && \
-    ls -la src/tcg_research/ && \
-    echo "=== models contents ===" && \
-    ls -la src/tcg_research/models/ && \
-    echo "=== Test import ===" && \
-    cd src && python -c "from tcg_research.models.database import Card; print('SUCCESS: Import works')"
+# DEBUG: Show what we copied - step by step
+RUN echo "=== DEBUG: Files copied ==="
+RUN ls -la src/ || echo "src/ directory missing!"
+RUN ls -la src/tcg_research/ || echo "tcg_research/ directory missing!"
+RUN ls -la src/tcg_research/models/ || echo "models/ directory missing!"
+RUN test -f src/tcg_research/models/__init__.py && echo "models/__init__.py exists" || echo "models/__init__.py MISSING!"
+RUN test -f src/tcg_research/models/database.py && echo "database.py exists" || echo "database.py MISSING!"
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
