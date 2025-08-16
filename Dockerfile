@@ -30,13 +30,18 @@ print("TCG Research API - Startup Diagnostics")\n\
 print("="*50)\n\
 print(f"Working directory: {os.getcwd()}")\n\
 print(f"Python path: {sys.path[:3]}")\n\
-print(f"DATABASE_URL set: {\"DATABASE_URL\" in os.environ}")\n\
-print(f"PORT: {os.environ.get(\"PORT\", \"8000 (default)\")}")\n\
-print(f"\\nContents of /app: {os.listdir(\"/app\")}")\n\
+db_set = "DATABASE_URL" in os.environ\n\
+print(f"DATABASE_URL set: {db_set}")\n\
+port_val = os.environ.get("PORT", "8000 (default)")\n\
+print(f"PORT: {port_val}")\n\
+app_contents = os.listdir("/app")\n\
+print(f"Contents of /app: {app_contents}")\n\
 if os.path.exists("/app/tcg_research"):\n\
-    print(f"Contents of /app/tcg_research: {os.listdir(\"/app/tcg_research\")}")\n\
+    tcg_contents = os.listdir("/app/tcg_research")\n\
+    print(f"Contents of /app/tcg_research: {tcg_contents}")\n\
     if os.path.exists("/app/tcg_research/models"):\n\
-        print(f"Contents of /app/tcg_research/models: {os.listdir(\"/app/tcg_research/models\")}")\n\
+        models_contents = os.listdir("/app/tcg_research/models")\n\
+        print(f"Contents of /app/tcg_research/models: {models_contents}")\n\
         print("✓ Models directory found!")\n\
     else:\n\
         print("✗ Models directory NOT found!")\n\
