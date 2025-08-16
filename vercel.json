@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "src/tcg_research/api/main.py",
+      "src": "main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "src/tcg_research/api/main.py"
+      "dest": "main.py"
     }
   ],
   "env": {
