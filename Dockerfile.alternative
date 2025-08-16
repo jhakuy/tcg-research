@@ -12,21 +12,19 @@ RUN apt-get update && apt-get install -y gcc g++ libpq-dev && rm -rf /var/lib/ap
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire repository
-COPY . .
+# Copy source code to the correct location
+COPY src/ /app/
+COPY docker-entrypoint-alt.sh /app/
 
-# Copy startup script (must be before changing user)
-COPY start_server.py /app/
+# Make entrypoint executable
+RUN chmod +x /app/docker-entrypoint-alt.sh
 
-# Set PYTHONPATH to include the src directory
-ENV PYTHONPATH=/app/src
+# No need for PYTHONPATH since tcg_research is directly in /app
+ENV PYTHONPATH=/app
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Stay in /app directory
-WORKDIR /app
-
-# Run using the startup script that handles imports correctly
-CMD ["python", "/app/start_server.py"]
+# Use the entrypoint script
+ENTRYPOINT ["/app/docker-entrypoint-alt.sh"]
