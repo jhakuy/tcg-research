@@ -14,10 +14,5 @@
   ],
   "env": {
     "PYTHON_VERSION": "3.10"
-  },
-  "functions": {
-    "src/tcg_research/api/main.py": {
-      "runtime": "python3.10"
-    }
   }
 }
