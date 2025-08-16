@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from tcg_research.core.features import FeatureEngineer
 from tcg_research.core.ingestion import DataIngestionPipeline, SpecificCardIngester
 from tcg_research.core.model import TCGMarketModel
+from tcg_research.core.conservative_model import ConservativeDecisionEngine
 from tcg_research.models.database import Card, ModelPrediction, create_database_engine
 from tcg_research.api.mock_data import generate_mock_recommendations, generate_mock_cards
 
@@ -131,6 +132,32 @@ async def health_check():
         "timestamp": datetime.utcnow(),
         "version": "0.1.0",
         "service": "tcg-research-api"
+    }
+
+@app.get("/investment-criteria")
+async def get_investment_criteria():
+    """Get the ultra-conservative investment criteria used by the system."""
+    return {
+        "philosophy": "Ultra-conservative approach that only recommends BUY for exceptional opportunities",
+        "buy_criteria": {
+            "minimum_predicted_return": "20%+ over 3 months",
+            "minimum_confidence": "90%+ model confidence",
+            "maximum_risk_level": "MEDIUM (no HIGH risk BUYs)",
+            "minimum_liquidity_score": "7/10 (good liquidity required)",
+            "minimum_momentum_score": "6/10 (strong momentum required)",
+            "minimum_stability_score": "6/10 (price stability required)"
+        },
+        "watch_criteria": {
+            "minimum_predicted_return": "5%+ over 3 months",
+            "minimum_confidence": "70%+ model confidence",
+            "maximum_predicted_loss": "-15% (don't watch if >15% loss expected)"
+        },
+        "avoid_criteria": {
+            "description": "Any card that doesn't meet WATCH criteria gets AVOID rating",
+            "triggers": ["Negative returns", "Low confidence", "Poor liquidity", "High volatility"]
+        },
+        "rationale": "Better to miss opportunities than lose money. Only invest when all signals align.",
+        "note": "This system prioritizes capital preservation over aggressive growth"
     }
 
 
@@ -374,15 +401,57 @@ async def get_mock_cards(limit: int = 100, offset: int = 0):
         logger.error("Mock cards failed", error=str(e))
         raise HTTPException(status_code=500, detail="Mock cards failed")
 
+# Ultra-conservative scan endpoint
+@app.get("/tcg/scan/conservative")
+async def tcg_scan_conservative(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    """Ultra-conservative TCG scan with strict BUY criteria."""
+    try:
+        # If no database, return conservative mock data
+        if SessionLocal is None:
+            logger.info("No database available, returning conservative mock data")
+            return await tcg_scan_mock(limit)
+            
+        # Use conservative decision engine
+        conservative_engine = ConservativeDecisionEngine(db)
+        recommendations = conservative_engine.process_card_recommendations()
+        
+        # Apply limit and filter for most relevant
+        limited_recs = recommendations[:limit]
+        
+        response = {
+            "message": f"Found {len(limited_recs)} ultra-conservative recommendations",
+            "timestamp": datetime.utcnow(),
+            "recommendations": limited_recs,
+            "criteria": {
+                "min_predicted_return_for_buy": "20%",
+                "min_confidence_for_buy": "90%",
+                "note": "Only exceptional opportunities get BUY rating"
+            }
+        }
+        
+        return response
+        
+    except Exception as e:
+        logger.error("Conservative scan failed", error=str(e))
+        return await tcg_scan_mock(limit)
+
 # Command to run the TCG scan
 @app.get("/tcg/scan")
 async def tcg_scan(
     limit: int = 10,
     min_confidence: float = 0.8,
+    conservative: bool = True,  # Default to conservative mode
     db: Session = Depends(get_db),
 ):
     """Main TCG scan command - get top recommendations."""
     try:
+        # Use conservative mode by default
+        if conservative:
+            return await tcg_scan_conservative(limit, db)
+            
         # If no database, return mock data
         if SessionLocal is None:
             logger.info("No database available, returning mock data")

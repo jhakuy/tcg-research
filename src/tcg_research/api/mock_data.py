@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import random
 
-# Mock card data
+# ULTRA CONSERVATIVE Mock card data - Very strict BUY criteria
 MOCK_CARDS = [
     {
         "id": 1,
@@ -12,11 +12,11 @@ MOCK_CARDS = [
         "set_code": "CP",
         "rarity": "Secret Rare",
         "current_price": 350.00,
-        "recommendation": "BUY",
-        "predicted_return_3m": 15.5,
-        "confidence": 0.87,
+        "recommendation": "BUY",  # Only exceptional opportunity
+        "predicted_return_3m": 28.5,  # Must be 20%+ for BUY
+        "confidence": 0.94,  # Must be 90%+ confidence
         "risk_level": "MEDIUM",
-        "rationale": "Strong demand from collectors, limited print run, popular Pokemon. Price has stabilized after initial drop."
+        "rationale": "STRONG BUY: 28.5% predicted return with 94% confidence. Exceptional price momentum. Excellent liquidity. High price stability. All conservative criteria met."
     },
     {
         "id": 2, 
@@ -24,11 +24,11 @@ MOCK_CARDS = [
         "set_code": "VIV",
         "rarity": "Rainbow Rare",
         "current_price": 125.00,
-        "recommendation": "WATCH",
-        "predicted_return_3m": 5.2,
-        "confidence": 0.72,
-        "risk_level": "LOW",
-        "rationale": "Steady popularity, good liquidity. Waiting for clearer trend direction before strong buy signal."
+        "recommendation": "WATCH",  # Good but not exceptional
+        "predicted_return_3m": 12.2,  # Under 20% threshold
+        "confidence": 0.82,  # Under 90% confidence
+        "risk_level": "MEDIUM",
+        "rationale": "WATCH: 12.2% predicted return with 82% confidence. Return below 20% BUY threshold. Confidence below 90% BUY threshold. Monitor for improvement."
     },
     {
         "id": 3,
@@ -36,11 +36,11 @@ MOCK_CARDS = [
         "set_code": "EVS", 
         "rarity": "Alternate Art",
         "current_price": 280.00,
-        "recommendation": "BUY",
-        "predicted_return_3m": 22.3,
-        "confidence": 0.91,
+        "recommendation": "BUY",  # Meets strict criteria
+        "predicted_return_3m": 31.8,  # High return
+        "confidence": 0.93,  # High confidence
         "risk_level": "MEDIUM",
-        "rationale": "Extremely popular card with strong artwork. Recent dip provides good entry point. High PSA 10 population pressure."
+        "rationale": "STRONG BUY: 31.8% predicted return with 93% confidence. Strong price momentum. Good liquidity. Stable pricing. All conservative criteria met."
     },
     {
         "id": 4,
@@ -49,10 +49,10 @@ MOCK_CARDS = [
         "rarity": "Rainbow Rare", 
         "current_price": 95.00,
         "recommendation": "AVOID",
-        "predicted_return_3m": -8.7,
+        "predicted_return_3m": -12.7,
         "confidence": 0.79,
         "risk_level": "HIGH",
-        "rationale": "Oversupplied market, declining interest. Better alternatives available in same price range."
+        "rationale": "AVOID: -12.7% predicted return with 79% confidence. Negative return expected. Low prediction confidence. Does not meet investment criteria."
     },
     {
         "id": 5,
@@ -60,11 +60,11 @@ MOCK_CARDS = [
         "set_code": "FST",
         "rarity": "Secret Rare",
         "current_price": 45.00,
-        "recommendation": "BUY", 
-        "predicted_return_3m": 18.9,
-        "confidence": 0.84,
-        "risk_level": "LOW",
-        "rationale": "Undervalued compared to similar cards. Strong tournament play history, good artwork appeal."
+        "recommendation": "WATCH", # Conservative downgrade - insufficient confidence
+        "predicted_return_3m": 16.2,  # Good return but under 20%
+        "confidence": 0.84,  # Under 90% confidence
+        "risk_level": "MEDIUM",
+        "rationale": "WATCH: 16.2% predicted return with 84% confidence. Return below 20% BUY threshold. Confidence below 90% BUY threshold. Monitor for improvement."
     },
     {
         "id": 6,
@@ -73,10 +73,10 @@ MOCK_CARDS = [
         "rarity": "Alternate Art",
         "current_price": 180.00,
         "recommendation": "WATCH",
-        "predicted_return_3m": 3.1,
-        "confidence": 0.65,
+        "predicted_return_3m": 8.1,
+        "confidence": 0.71,
         "risk_level": "MEDIUM", 
-        "rationale": "Nice artwork but lower demand than other Eeveelutions. Market seems fairly priced currently."
+        "rationale": "WATCH: 8.1% predicted return with 71% confidence. Return below 20% BUY threshold. Confidence below 90% BUY threshold. Monitor for improvement."
     },
     {
         "id": 7,
@@ -84,11 +84,23 @@ MOCK_CARDS = [
         "set_code": "FST",
         "rarity": "Rainbow Rare",
         "current_price": 65.00,
-        "recommendation": "BUY",
-        "predicted_return_3m": 12.4,
-        "confidence": 0.76,
-        "risk_level": "LOW",
-        "rationale": "Popular Pokemon with good competitive usage. Recent price consolidation suggests upward movement."
+        "recommendation": "WATCH", # Conservative downgrade
+        "predicted_return_3m": 14.4,  # Under 20% threshold
+        "confidence": 0.76,  # Under 90% confidence
+        "risk_level": "MEDIUM",
+        "rationale": "WATCH: 14.4% predicted return with 76% confidence. Return below 20% BUY threshold. Confidence below 90% BUY threshold. Monitor for improvement."
+    },
+    {
+        "id": 8,
+        "name": "Lugia VSTAR (Silver Tempest)",
+        "set_code": "SIT",
+        "rarity": "Secret Rare",
+        "current_price": 85.00,
+        "recommendation": "AVOID",
+        "predicted_return_3m": 3.2,
+        "confidence": 0.68,
+        "risk_level": "HIGH",
+        "rationale": "AVOID: 3.2% predicted return with 68% confidence. Low return potential. Low prediction confidence. Weak momentum. Does not meet investment criteria."
     }
 ]
 
