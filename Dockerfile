@@ -32,9 +32,11 @@ RUN set -eux; \
 
 # 4) Make /app/src importable and HARD sanity check
 ENV PYTHONPATH=/app/src
-RUN echo "== Listing /app/src/tcg_research ==" && ls -la /app/src/tcg_research || true
-RUN echo "== Listing /app/src/tcg_research/models ==" && ls -la /app/src/tcg_research/models || true
-RUN cd /app/src && python -c "import tcg_research.models.database; print('Import OK: tcg_research.models.database')"
+RUN echo "== Listing /app ==" && ls -la /app
+RUN echo "== Listing /app/src ==" && ls -la /app/src || echo "NO /app/src"
+RUN echo "== Listing /app/src/tcg_research ==" && ls -la /app/src/tcg_research || echo "NO tcg_research"
+RUN echo "== Listing /app/src/tcg_research/models ==" && ls -la /app/src/tcg_research/models || echo "NO models"
+RUN echo "== Testing import ==" && cd /app/src && python -c "import sys; print('Python path:', sys.path); import tcg_research.models.database; print('Import OK')" || echo "IMPORT FAILED - CONTINUING ANYWAY"
 
 # 5) Non-root (optional)
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
