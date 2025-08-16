@@ -9,10 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
 
-from ..core.features import FeatureEngineer
-from ..core.ingestion import DataIngestionPipeline, SpecificCardIngester
-from ..core.model import TCGMarketModel
-from ..models.database import Card, ModelPrediction, create_database_engine
+try:
+    from ..core.features import FeatureEngineer
+    from ..core.ingestion import DataIngestionPipeline, SpecificCardIngester
+    from ..core.model import TCGMarketModel
+    from ..models.database import Card, ModelPrediction, create_database_engine
+except ImportError:
+    # Fallback for deployment issues
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    
+    from tcg_research.core.features import FeatureEngineer
+    from tcg_research.core.ingestion import DataIngestionPipeline, SpecificCardIngester
+    from tcg_research.core.model import TCGMarketModel
+    from tcg_research.models.database import Card, ModelPrediction, create_database_engine
 
 # Configure logging
 structlog.configure(
@@ -44,14 +55,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database setup
+# Database setup with fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tcg_user:tcg_password@localhost:5432/tcg_research")
-engine = create_database_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+try:
+    engine = create_database_engine(DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    logger.info("Database connection established", url=DATABASE_URL.split('@')[-1])  # Don't log credentials
+except Exception as e:
+    logger.error("Database connection failed", error=str(e))
+    # Create a dummy session for development
+    SessionLocal = None
 
 
 def get_db():
     """Get database session."""
+    if SessionLocal is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
     db = SessionLocal()
     try:
         yield db
