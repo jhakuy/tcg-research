@@ -32,18 +32,9 @@ RUN set -eux; \
 
 # 4) Make /app/src importable and HARD sanity check
 ENV PYTHONPATH=/app/src
-RUN set -eux; \
-    echo "== Listing /app/src/tcg_research =="; ls -la /app/src/tcg_research || true; \
-    echo "== Listing /app/src/tcg_research/models =="; ls -la /app/src/tcg_research/models || true; \
-    python - <<'PY' \
-import sys, importlib, os; \
-sys.path.insert(0, "/app/src"); \
-print("sys.path[0]=", sys.path[0]); \
-print("exists pkg:", os.path.isdir("/app/src/tcg_research")); \
-print("exists models:", os.path.isdir("/app/src/tcg_research/models")); \
-importlib.import_module("tcg_research.models.database"); \
-print("Import OK: tcg_research.models.database") \
-PY
+RUN echo "== Listing /app/src/tcg_research ==" && ls -la /app/src/tcg_research || true
+RUN echo "== Listing /app/src/tcg_research/models ==" && ls -la /app/src/tcg_research/models || true
+RUN cd /app/src && python -c "import tcg_research.models.database; print('Import OK: tcg_research.models.database')"
 
 # 5) Non-root (optional)
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
