@@ -48,8 +48,8 @@ async def get_all_api_status():
         },
         "psa": {
             "name": "PSA API",
-            "required_vars": ["PSA_API_KEY"], 
-            "test_endpoint": "/api/test-apis/psa"
+            "required_vars": ["PSA_ACCESS_TOKEN"],
+            "test_endpoint": "/api/psa/status"
         },
         "database": {
             "name": "PostgreSQL Database",

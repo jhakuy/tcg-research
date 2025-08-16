@@ -18,6 +18,7 @@ from tcg_research.api.mock_data import generate_mock_recommendations, generate_m
 from tcg_research.api.ebay_setup import router as ebay_router
 from tcg_research.api.ebay_webhook import router as webhook_router
 from tcg_research.api.api_setup import router as api_setup_router
+from tcg_research.api.psa_endpoints import router as psa_router
 
 # Configure logging
 structlog.configure(
@@ -53,6 +54,7 @@ app.add_middleware(
 app.include_router(ebay_router, prefix="/api", tags=["eBay Setup"])
 app.include_router(webhook_router, tags=["eBay Webhooks"])
 app.include_router(api_setup_router, tags=["API Setup & Filtering"])
+app.include_router(psa_router, prefix="/api", tags=["PSA API"])
 
 # Database setup with fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tcg_user:tcg_password@localhost:5432/tcg_research")

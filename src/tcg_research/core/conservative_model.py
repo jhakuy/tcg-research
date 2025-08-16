@@ -1,8 +1,9 @@
 """Ultra-conservative decision making engine for TCG investments."""
 
 import json
+import os
 from datetime import datetime
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 import numpy as np
 import pandas as pd
 import structlog
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from tcg_research.models.database import Card, CardFeature, ModelPrediction
 from tcg_research.core.model import TCGMarketModel
+from tcg_research.mcp.psa_api import PSAAPIClient, PSAPopulationData
 
 logger = structlog.get_logger()
 
@@ -21,7 +23,13 @@ class ConservativeDecisionEngine:
         self.db_session = db_session
         self.base_model = TCGMarketModel(db_session)
         
-        # ULTRA CONSERVATIVE CRITERIA
+        # PSA API integration with smart caching
+        self.psa_client = None
+        self.psa_cache = {}  # Local cache to minimize API calls
+        self.daily_psa_calls = 0
+        self.max_daily_psa_calls = 95  # Leave 5 calls as buffer from 100 limit
+        
+        # ULTRA CONSERVATIVE CRITERIA (Enhanced with PSA data)
         self.buy_criteria = {
             'min_predicted_return': 20.0,      # Must predict at least 20% return
             'min_confidence': 0.90,            # Must be 90%+ confident
@@ -29,6 +37,8 @@ class ConservativeDecisionEngine:
             'min_liquidity_score': 7.0,       # Good liquidity required
             'min_momentum_score': 6.0,         # Strong momentum required
             'min_stability_score': 6.0,       # Price stability required
+            'min_scarcity_score': 70.0,       # PSA scarcity score 70+
+            'max_gem_rate': 15.0,             # Cards with <15% PSA 10 rate preferred
         }
         
         self.watch_criteria = {
@@ -143,38 +153,161 @@ class ConservativeDecisionEngine:
         
         return max(score, 0.0)
 
-    def make_conservative_decision(
+    async def get_psa_client(self) -> Optional[PSAAPIClient]:
+        """Get PSA client if available and within daily limits."""
+        if self.daily_psa_calls >= self.max_daily_psa_calls:
+            logger.warning("PSA daily call limit reached", calls_made=self.daily_psa_calls)
+            return None
+            
+        if not self.psa_client:
+            access_token = os.getenv('PSA_ACCESS_TOKEN')
+            if access_token:
+                self.psa_client = PSAAPIClient(access_token)
+                logger.info("PSA client initialized")
+            else:
+                logger.warning("No PSA access token found")
+                return None
+                
+        return self.psa_client
+
+    async def get_psa_scarcity_score(self, card_name: str, set_name: str) -> Dict[str, float]:
+        """Get PSA scarcity data with smart caching."""
+        cache_key = f"{card_name}_{set_name}"
+        
+        # Check cache first
+        if cache_key in self.psa_cache:
+            logger.debug("Using cached PSA data", card=card_name)
+            return self.psa_cache[cache_key]
+        
+        # Try to get fresh data if within limits
+        psa_client = await self.get_psa_client()
+        if not psa_client:
+            # Return neutral scores if PSA unavailable
+            return {
+                'scarcity_score': 50.0,
+                'gem_rate': 10.0,
+                'total_graded': 0,
+                'confidence_bonus': 0.0
+            }
+        
+        try:
+            async with psa_client as client:
+                pop_data = await client.get_population_data(card_name, set_name)
+                self.daily_psa_calls += 1
+                
+                if pop_data:
+                    scores = {
+                        'scarcity_score': pop_data.scarcity_score,
+                        'gem_rate': pop_data.gem_rate,
+                        'total_graded': pop_data.total_graded,
+                        'confidence_bonus': self._calculate_psa_confidence_bonus(pop_data)
+                    }
+                    
+                    # Cache for future use
+                    self.psa_cache[cache_key] = scores
+                    
+                    logger.info(
+                        "PSA data retrieved",
+                        card=card_name,
+                        scarcity=scores['scarcity_score'],
+                        gem_rate=scores['gem_rate'],
+                        calls_remaining=self.max_daily_psa_calls - self.daily_psa_calls
+                    )
+                    
+                    return scores
+                else:
+                    # No PSA data found - return neutral scores
+                    neutral_scores = {
+                        'scarcity_score': 40.0,  # Slightly below neutral
+                        'gem_rate': 12.0,
+                        'total_graded': 0,
+                        'confidence_bonus': 0.0
+                    }
+                    self.psa_cache[cache_key] = neutral_scores
+                    return neutral_scores
+                    
+        except Exception as e:
+            logger.error("PSA API call failed", card=card_name, error=str(e))
+            # Return neutral scores on error
+            return {
+                'scarcity_score': 50.0,
+                'gem_rate': 10.0,
+                'total_graded': 0,
+                'confidence_bonus': 0.0
+            }
+
+    def _calculate_psa_confidence_bonus(self, pop_data: PSAPopulationData) -> float:
+        """Calculate confidence bonus based on PSA population data."""
+        bonus = 0.0
+        
+        # Scarcity bonus (higher scarcity = more confidence)
+        if pop_data.scarcity_score >= 90:
+            bonus += 0.08  # 8% confidence boost for extremely rare
+        elif pop_data.scarcity_score >= 70:
+            bonus += 0.05  # 5% boost for rare
+        elif pop_data.scarcity_score >= 50:
+            bonus += 0.02  # 2% boost for moderately rare
+        
+        # Grading difficulty bonus (lower gem rate = harder to grade = more valuable)
+        if pop_data.gem_rate <= 3:
+            bonus += 0.06  # 6% boost for extremely difficult grades
+        elif pop_data.gem_rate <= 8:
+            bonus += 0.04  # 4% boost for difficult grades
+        elif pop_data.gem_rate <= 15:
+            bonus += 0.02  # 2% boost for moderate difficulty
+        
+        # Population size factor
+        if pop_data.total_graded <= 50:
+            bonus += 0.03  # 3% boost for very low population
+        elif pop_data.total_graded <= 200:
+            bonus += 0.02  # 2% boost for low population
+        
+        return min(bonus, 0.15)  # Cap at 15% total bonus
+
+    async def make_conservative_decision(
         self, 
         card: Card, 
         base_prediction: Dict[str, Any], 
         features: CardFeature
     ) -> Tuple[str, str, Dict[str, float]]:
-        """Make ultra-conservative investment decision."""
+        """Make ultra-conservative investment decision with PSA scarcity data."""
         
-        # Calculate scores
+        # Calculate base scores
         liquidity_score = self.calculate_liquidity_score(features)
         momentum_score = self.calculate_momentum_score(features)
         stability_score = self.calculate_stability_score(features)
+        
+        # Get PSA scarcity data (smart caching to conserve API calls)
+        psa_data = await self.get_psa_scarcity_score(card.name, card.set_name or "Unknown")
+        
+        # Apply PSA confidence bonus to model confidence
+        base_confidence = base_prediction['confidence']
+        enhanced_confidence = min(1.0, base_confidence + psa_data['confidence_bonus'])
         
         scores = {
             'liquidity': liquidity_score,
             'momentum': momentum_score,
             'stability': stability_score,
-            'confidence': base_prediction['confidence'],
-            'predicted_return': base_prediction['predicted_return_3m']
+            'confidence': enhanced_confidence,
+            'predicted_return': base_prediction['predicted_return_3m'],
+            'scarcity_score': psa_data['scarcity_score'],
+            'gem_rate': psa_data['gem_rate'],
+            'psa_confidence_bonus': psa_data['confidence_bonus']
         }
         
         # Extract values
         predicted_return = base_prediction['predicted_return_3m']
-        confidence = base_prediction['confidence']
+        confidence = enhanced_confidence
         
-        # ULTRA CONSERVATIVE BUY CRITERIA
+        # ULTRA CONSERVATIVE BUY CRITERIA (Enhanced with PSA data)
         buy_checks = [
             predicted_return >= self.buy_criteria['min_predicted_return'],
             confidence >= self.buy_criteria['min_confidence'],
             liquidity_score >= self.buy_criteria['min_liquidity_score'],
             momentum_score >= self.buy_criteria['min_momentum_score'],
             stability_score >= self.buy_criteria['min_stability_score'],
+            psa_data['scarcity_score'] >= self.buy_criteria['min_scarcity_score'],
+            psa_data['gem_rate'] <= self.buy_criteria['max_gem_rate'],
         ]
         
         if all(buy_checks):
@@ -198,7 +331,7 @@ class ConservativeDecisionEngine:
         return decision, rationale, scores
 
     def _generate_buy_rationale(self, card: Card, scores: Dict[str, float], features: CardFeature) -> str:
-        """Generate rationale for BUY recommendation."""
+        """Generate rationale for BUY recommendation with PSA insights."""
         parts = [
             f"STRONG BUY: {scores['predicted_return']:.1f}% predicted return with {scores['confidence']:.0%} confidence"
         ]
@@ -217,8 +350,22 @@ class ConservativeDecisionEngine:
             parts.append("High price stability")
         elif scores['stability'] >= 6:
             parts.append("Stable pricing")
+        
+        # PSA scarcity insights
+        if scores['scarcity_score'] >= 90:
+            parts.append(f"Extremely rare (PSA scarcity: {scores['scarcity_score']:.0f}/100)")
+        elif scores['scarcity_score'] >= 70:
+            parts.append(f"Rare card (PSA scarcity: {scores['scarcity_score']:.0f}/100)")
+        
+        if scores['gem_rate'] <= 5:
+            parts.append(f"Very difficult to grade ({scores['gem_rate']:.1f}% PSA 10 rate)")
+        elif scores['gem_rate'] <= 10:
+            parts.append(f"Difficult to grade ({scores['gem_rate']:.1f}% PSA 10 rate)")
+        
+        if scores.get('psa_confidence_bonus', 0) > 0:
+            parts.append(f"PSA data boost: +{scores['psa_confidence_bonus']:.0%} confidence")
             
-        parts.append("All conservative criteria met")
+        parts.append("All ultra-conservative criteria met")
         
         return ". ".join(parts) + "."
 
