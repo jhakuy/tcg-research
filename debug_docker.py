@@ -88,28 +88,25 @@ def test_imports():
     print("\n🔍 Testing imports locally...")
     
     test_script = '''
-import sys
-sys.path.insert(0, "src")
-
 try:
     from tcg_research.models.database import Card
-    print("✅ Import tcg_research.models.database works")
+    print("SUCCESS: Import tcg_research.models.database works")
 except ImportError as e:
-    print(f"❌ Import failed: {e}")
+    print(f"FAILED: Import failed: {e}")
     sys.exit(1)
 
 try:
     from tcg_research.core.features import FeatureEngineer  
-    print("✅ Import tcg_research.core.features works")
+    print("SUCCESS: Import tcg_research.core.features works")
 except ImportError as e:
-    print(f"❌ Import failed: {e}")
+    print(f"FAILED: Import failed: {e}")
     sys.exit(1)
 
 try:
     from tcg_research.api.main import app
-    print("✅ Import tcg_research.api.main works")
+    print("SUCCESS: Import tcg_research.api.main works")
 except ImportError as e:
-    print(f"❌ Import failed: {e}")
+    print(f"FAILED: Import failed: {e}")
     sys.exit(1)
 '''
     

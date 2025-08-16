@@ -7,8 +7,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Package is now properly installed, no path manipulation needed
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
